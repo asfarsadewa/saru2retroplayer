@@ -159,6 +159,19 @@ body {
     background: transparent !important;
 }
 
+/* Video Aspect Modes */
+#videoPlayer.aspect-crop {
+    object-fit: cover;
+}
+
+#videoPlayer.aspect-stretch {
+    object-fit: fill;
+}
+
+#videoPlayer.aspect-fit {
+    object-fit: contain;
+}
+
 .subtitle-overlay {
     position: absolute;
     bottom: 10%;

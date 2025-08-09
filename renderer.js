@@ -14,6 +14,7 @@ class RetroVideoPlayer {
         this.muteBtn = document.getElementById('muteBtn');
         this.subtitleBtn = document.getElementById('subtitleBtn');
         this.audioBtn = document.getElementById('audioBtn');
+        this.aspectBtn = document.getElementById('aspectBtn');
         this.audioSelectionOverlay = document.getElementById('audioSelectionOverlay');
         this.audioTrackList = document.getElementById('audioTrackList');
         this.confirmAudioBtn = document.getElementById('confirmAudioBtn');
@@ -40,6 +41,8 @@ class RetroVideoPlayer {
         this.currentVideoPath = null;
         this.selectedAudioTrack = 0;
         this.isWaitingForAudioSelection = false;
+        this.aspectModes = ['crop', 'stretch', 'fit'];
+        this.currentAspectMode = 1; // Default to stretch mode
         
         this.initializeEventListeners();
         this.applyRetroEffects();
@@ -76,6 +79,7 @@ class RetroVideoPlayer {
         this.muteBtn.addEventListener('click', () => this.toggleMute());
         this.subtitleBtn.addEventListener('click', () => this.toggleSubtitles());
         this.audioBtn.addEventListener('click', () => this.switchAudioTrack());
+        this.aspectBtn.addEventListener('click', () => this.toggleAspectMode());
         this.confirmAudioBtn.addEventListener('click', () => this.confirmAudioSelection());
         this.cancelAudioBtn.addEventListener('click', () => this.cancelAudioSelection());
         
@@ -167,6 +171,13 @@ class RetroVideoPlayer {
         this.video.src = `file://${this.currentVideoPath}`;
         this.video.style.display = 'block';
         this.addVHSEffect();
+        
+        // Set initial aspect mode (stretch by default)
+        this.video.classList.add(`aspect-${this.aspectModes[this.currentAspectMode]}`);
+        // Update button to show stretch mode is active
+        this.aspectBtn.classList.add('active');
+        this.aspectBtn.querySelector('.btn-icon').textContent = '▭';
+        this.aspectBtn.querySelector('.btn-label').textContent = 'STRETCH';
         
         // Load subtitles
         this.loadSubtitleTracks();
@@ -354,6 +365,8 @@ class RetroVideoPlayer {
             this.toggleSubtitles();
         } else if (e.code === 'KeyA') {
             this.switchAudioTrack();
+        } else if (e.code === 'KeyR') {
+            this.toggleAspectMode();
         }
     }
     
@@ -668,6 +681,39 @@ class RetroVideoPlayer {
                 this.subtitleOverlay.textContent = '';
             }
         };
+    }
+    
+    toggleAspectMode() {
+        // Remove current aspect class
+        this.video.classList.remove(`aspect-${this.aspectModes[this.currentAspectMode]}`);
+        
+        // Cycle to next mode
+        this.currentAspectMode = (this.currentAspectMode + 1) % this.aspectModes.length;
+        
+        // Add new aspect class
+        this.video.classList.add(`aspect-${this.aspectModes[this.currentAspectMode]}`);
+        
+        // Update button appearance based on mode
+        const btnIcon = this.aspectBtn.querySelector('.btn-icon');
+        const btnLabel = this.aspectBtn.querySelector('.btn-label');
+        
+        switch(this.aspectModes[this.currentAspectMode]) {
+            case 'crop':
+                btnIcon.textContent = '◧';
+                btnLabel.textContent = 'CROP';
+                this.aspectBtn.classList.remove('active');
+                break;
+            case 'stretch':
+                btnIcon.textContent = '▭';
+                btnLabel.textContent = 'STRETCH';
+                this.aspectBtn.classList.add('active');
+                break;
+            case 'fit':
+                btnIcon.textContent = '◫';
+                btnLabel.textContent = 'FIT';
+                this.aspectBtn.classList.add('active');
+                break;
+        }
     }
     
     setupAudioTrackSwitching() {
