@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saru2 Retro Player</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="tv-container">
+        <div class="tv-frame">
+            <div class="tv-screen">
+                <div class="crt-overlay">
+                    <div class="video-container">
+                        <video id="videoPlayer" preload="metadata" crossorigin="anonymous"></video>
+                        <div class="subtitle-overlay" id="subtitleOverlay"></div>
+                        <div class="video-overlay">
+                            <div class="play-button" id="playButton">
+                                <div class="play-icon">▶</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    
+                    <div class="drop-zone" id="dropZone">
+                        <div class="drop-message">
+                            <div class="tv-icon">📺</div>
+                            <h2>Saru2 Retro Player</h2>
+                            <p>Drop a video file here or use Ctrl+O to open</p>
+                            <div class="supported-formats">
+                                Supports: MP4, AVI, MKV, MOV, WMV, FLV, WEBM
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="scanlines"></div>
+                <div class="vhs-noise"></div>
+                <div class="screen-flicker"></div>
+                <div class="vhs-tracking"></div>
+                <div class="color-shift"></div>
+                <div class="screen-jitter"></div>
+                <div class="phosphor-spots"></div>
+            </div>
+            
+            <div class="tv-bezel">
+                <div class="tv-brand">SARU2</div>
+                <div class="tv-led"></div>
+            </div>
+        </div>
+        
+        <!-- 80s VCR Control Panel -->
+        <div class="vcr-panel">
+            <div class="vcr-header">
+                <div class="vcr-brand">SARU2</div>
+                <div class="vcr-model">VCR-85</div>
+                <div class="power-section">
+                    <div class="power-led"></div>
+                    <div class="power-label">POWER</div>
+                </div>
+            </div>
+            
+            <div class="vcr-controls">
+                <div class="transport-buttons">
+                    <button id="rewBtn" class="vcr-btn transport-btn">
+                        <div class="btn-icon">⏪</div>
+                        <div class="btn-label">REW</div>
+                    </button>
+                    <button id="stopBtn" class="vcr-btn transport-btn">
+                        <div class="btn-icon">■</div>
+                        <div class="btn-label">STOP</div>
+                    </button>
+                    <button id="playPauseBtn" class="vcr-btn transport-btn primary">
+                        <div class="btn-icon">▶</div>
+                        <div class="btn-label">PLAY</div>
+                    </button>
+                    <button id="ffBtn" class="vcr-btn transport-btn">
+                        <div class="btn-icon">⏩</div>
+                        <div class="btn-label">FF</div>
+                    </button>
+                </div>
+                
+                <div class="volume-section">
+                    <div class="volume-label">VOLUME</div>
+                    <div class="volume-knob-container">
+                        <div class="volume-knob" id="volumeKnob">
+                            <div class="knob-pointer"></div>
+                            <input type="range" id="volumeSlider" class="volume-input" min="0" max="100" value="70">
+                        </div>
+                    </div>
+                    <button id="muteBtn" class="vcr-btn small-btn">
+                        <div class="btn-icon small">🔊</div>
+                        <div class="btn-label">MUTE</div>
+                    </button>
+                    <button id="subtitleBtn" class="vcr-btn small-btn">
+                        <div class="btn-icon small">CC</div>
+                        <div class="btn-label">SUB</div>
+                    </button>
+                    <button id="audioBtn" class="vcr-btn small-btn">
+                        <div class="btn-icon small">🎵</div>
+                        <div class="btn-label">AUDIO</div>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="vcr-display">
+                <div class="tape-counter">
+                    <div class="counter-label">TAPE COUNTER</div>
+                    <div class="counter-display">
+                        <div class="led-display">
+                            <span id="currentTime">00:00</span>
+                            <span class="separator">/</span>
+                            <span id="duration">00:00</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="progress-section">
+                    <div class="progress-label">PROGRESS</div>
+                    <div class="tape-bar">
+                        <input type="range" id="progressBar" class="tape-slider" min="0" max="100" value="0">
+                        <div class="tape-reels">
+                            <div class="reel left-reel"></div>
+                            <div class="tape-path"></div>
+                            <div class="reel right-reel"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="status-indicators">
+                    <div class="status-light play-indicator">
+                        <div class="indicator-dot"></div>
+                        <div class="indicator-label">PLAY</div>
+                    </div>
+                    <div class="status-light pause-indicator">
+                        <div class="indicator-dot"></div>
+                        <div class="indicator-label">PAUSE</div>
+                    </div>
+                    <div class="status-light rec-indicator">
+                        <div class="indicator-dot"></div>
+                        <div class="indicator-label">REC</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio Track Selection Dialog -->
+    <div class="audio-selection-overlay" id="audioSelectionOverlay" style="display: none;">
+        <div class="audio-selection-dialog">
+            <div class="dialog-header">
+                <div class="dialog-title">🎵 AUDIO TRACK SELECTION</div>
+                <div class="dialog-subtitle">Choose your preferred audio track</div>
+            </div>
+            <div class="audio-track-list" id="audioTrackList">
+                <!-- Audio tracks will be populated here -->
+            </div>
+            <div class="dialog-buttons">
+                <button id="confirmAudioBtn" class="dialog-btn primary">START PLAYBACK</button>
+                <button id="cancelAudioBtn" class="dialog-btn">USE DEFAULT</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="renderer.js"></script>
+</body>
+</html>
