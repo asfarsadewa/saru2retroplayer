@@ -148,10 +148,14 @@ class RetroVideoPlayer {
             this.audioTracks = await ipcRenderer.invoke('get-audio-tracks', filePath);
             
             // If multiple audio tracks exist, show selection dialog
+            // TODO: Implement audio track switching with FFmpeg (see GitHub issue)
+            // For now, always use the default (first) audio track
+            /*
             if (this.audioTracks.length > 1 && selectedAudioTrack === 0) {
                 this.showAudioSelectionDialog();
                 return; // Wait for user selection
             }
+            */
             
             // Load video with selected audio track
             this.selectedAudioTrack = selectedAudioTrack;
