@@ -14,6 +14,7 @@ class RetroVideoPlayer {
         this.muteBtn = document.getElementById('muteBtn');
         this.subtitleBtn = document.getElementById('subtitleBtn');
         this.audioBtn = document.getElementById('audioBtn');
+        this.aspectBtn = document.getElementById('aspectBtn');
         this.audioSelectionOverlay = document.getElementById('audioSelectionOverlay');
         this.audioTrackList = document.getElementById('audioTrackList');
         this.confirmAudioBtn = document.getElementById('confirmAudioBtn');
@@ -40,6 +41,8 @@ class RetroVideoPlayer {
         this.currentVideoPath = null;
         this.selectedAudioTrack = 0;
         this.isWaitingForAudioSelection = false;
+        this.aspectModes = ['crop', 'stretch', 'fit'];
+        this.currentAspectMode = 1; // Default to stretch mode
         
         this.initializeEventListeners();
         this.applyRetroEffects();
@@ -76,6 +79,7 @@ class RetroVideoPlayer {
         this.muteBtn.addEventListener('click', () => this.toggleMute());
         this.subtitleBtn.addEventListener('click', () => this.toggleSubtitles());
         this.audioBtn.addEventListener('click', () => this.switchAudioTrack());
+        this.aspectBtn.addEventListener('click', () => this.toggleAspectMode());
         this.confirmAudioBtn.addEventListener('click', () => this.confirmAudioSelection());
         this.cancelAudioBtn.addEventListener('click', () => this.cancelAudioSelection());
         
@@ -144,10 +148,14 @@ class RetroVideoPlayer {
             this.audioTracks = await ipcRenderer.invoke('get-audio-tracks', filePath);
             
             // If multiple audio tracks exist, show selection dialog
+            // TODO: Implement audio track switching with FFmpeg (see GitHub issue)
+            // For now, always use the default (first) audio track
+            /*
             if (this.audioTracks.length > 1 && selectedAudioTrack === 0) {
                 this.showAudioSelectionDialog();
                 return; // Wait for user selection
             }
+            */
             
             // Load video with selected audio track
             this.selectedAudioTrack = selectedAudioTrack;
@@ -167,6 +175,13 @@ class RetroVideoPlayer {
         this.video.src = `file://${this.currentVideoPath}`;
         this.video.style.display = 'block';
         this.addVHSEffect();
+        
+        // Set initial aspect mode (stretch by default)
+        this.video.classList.add(`aspect-${this.aspectModes[this.currentAspectMode]}`);
+        // Update button to show stretch mode is active
+        this.aspectBtn.classList.add('active');
+        this.aspectBtn.querySelector('.btn-icon').textContent = '▭';
+        this.aspectBtn.querySelector('.btn-label').textContent = 'STRETCH';
         
         // Load subtitles
         this.loadSubtitleTracks();
@@ -354,6 +369,8 @@ class RetroVideoPlayer {
             this.toggleSubtitles();
         } else if (e.code === 'KeyA') {
             this.switchAudioTrack();
+        } else if (e.code === 'KeyR') {
+            this.toggleAspectMode();
         }
     }
     
@@ -370,10 +387,14 @@ class RetroVideoPlayer {
         
         video.style.filter = `
             sepia(0.3)
-            saturate(0.8)
-            contrast(1.2)
-            brightness(0.9)
-            hue-rotate(-10deg)
+            saturate(0.65)
+            contrast(0.85)
+            brightness(1.05)
+            hue-rotate(-8deg)
+            blur(2px)
+            drop-shadow(2px 0px 0px rgba(255, 0, 0, 0.4))
+            drop-shadow(-2px 0px 0px rgba(0, 255, 255, 0.4))
+            drop-shadow(0px 1px 0px rgba(255, 0, 255, 0.3))
         `;
         
         this.createStaticNoise();
@@ -402,28 +423,31 @@ class RetroVideoPlayer {
         
         // Add color channel separation
         setInterval(() => {
-            if (Math.random() < 0.02) {
-                const intensity = Math.random() * 3 + 1;
+            if (Math.random() < 0.03) {
+                const intensity = Math.random() * 4 + 2;
+                const blurAmount = Math.random() * 1.5 + 2;
                 video.style.filter = `
-                    sepia(0.3)
-                    saturate(0.7)
-                    contrast(0.9)
+                    sepia(0.35)
+                    saturate(0.6)
+                    contrast(0.8)
                     brightness(1.1)
-                    hue-rotate(-8deg)
-                    blur(0.8px)
-                    drop-shadow(${intensity}px 0px 0px rgba(255, 0, 255, 0.2))
-                    drop-shadow(-${intensity}px 0px 0px rgba(0, 255, 255, 0.2))
+                    hue-rotate(-10deg)
+                    blur(${blurAmount}px)
+                    drop-shadow(${intensity}px 0px 0px rgba(255, 0, 0, 0.5))
+                    drop-shadow(-${intensity}px 0px 0px rgba(0, 255, 255, 0.5))
+                    drop-shadow(0px ${intensity/2}px 0px rgba(255, 0, 255, 0.4))
                 `;
                 setTimeout(() => {
                     video.style.filter = `
                         sepia(0.3)
-                        saturate(0.7)
-                        contrast(0.9)
-                        brightness(1.1)
+                        saturate(0.65)
+                        contrast(0.85)
+                        brightness(1.05)
                         hue-rotate(-8deg)
-                        blur(0.8px)
-                        drop-shadow(1px 0px 0px rgba(255, 0, 255, 0.15))
-                        drop-shadow(-1px 0px 0px rgba(0, 255, 255, 0.15))
+                        blur(2px)
+                        drop-shadow(2px 0px 0px rgba(255, 0, 0, 0.4))
+                        drop-shadow(-2px 0px 0px rgba(0, 255, 255, 0.4))
+                        drop-shadow(0px 1px 0px rgba(255, 0, 255, 0.3))
                     `;
                 }, Math.random() * 150 + 50);
             }
@@ -668,6 +692,39 @@ class RetroVideoPlayer {
                 this.subtitleOverlay.textContent = '';
             }
         };
+    }
+    
+    toggleAspectMode() {
+        // Remove current aspect class
+        this.video.classList.remove(`aspect-${this.aspectModes[this.currentAspectMode]}`);
+        
+        // Cycle to next mode
+        this.currentAspectMode = (this.currentAspectMode + 1) % this.aspectModes.length;
+        
+        // Add new aspect class
+        this.video.classList.add(`aspect-${this.aspectModes[this.currentAspectMode]}`);
+        
+        // Update button appearance based on mode
+        const btnIcon = this.aspectBtn.querySelector('.btn-icon');
+        const btnLabel = this.aspectBtn.querySelector('.btn-label');
+        
+        switch(this.aspectModes[this.currentAspectMode]) {
+            case 'crop':
+                btnIcon.textContent = '◧';
+                btnLabel.textContent = 'CROP';
+                this.aspectBtn.classList.remove('active');
+                break;
+            case 'stretch':
+                btnIcon.textContent = '▭';
+                btnLabel.textContent = 'STRETCH';
+                this.aspectBtn.classList.add('active');
+                break;
+            case 'fit':
+                btnIcon.textContent = '◫';
+                btnLabel.textContent = 'FIT';
+                this.aspectBtn.classList.add('active');
+                break;
+        }
     }
     
     setupAudioTrackSwitching() {
