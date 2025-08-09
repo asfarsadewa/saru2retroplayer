@@ -383,10 +383,14 @@ class RetroVideoPlayer {
         
         video.style.filter = `
             sepia(0.3)
-            saturate(0.8)
-            contrast(1.2)
-            brightness(0.9)
-            hue-rotate(-10deg)
+            saturate(0.65)
+            contrast(0.85)
+            brightness(1.05)
+            hue-rotate(-8deg)
+            blur(2px)
+            drop-shadow(2px 0px 0px rgba(255, 0, 0, 0.4))
+            drop-shadow(-2px 0px 0px rgba(0, 255, 255, 0.4))
+            drop-shadow(0px 1px 0px rgba(255, 0, 255, 0.3))
         `;
         
         this.createStaticNoise();
@@ -415,28 +419,31 @@ class RetroVideoPlayer {
         
         // Add color channel separation
         setInterval(() => {
-            if (Math.random() < 0.02) {
-                const intensity = Math.random() * 3 + 1;
+            if (Math.random() < 0.03) {
+                const intensity = Math.random() * 4 + 2;
+                const blurAmount = Math.random() * 1.5 + 2;
                 video.style.filter = `
-                    sepia(0.3)
-                    saturate(0.7)
-                    contrast(0.9)
+                    sepia(0.35)
+                    saturate(0.6)
+                    contrast(0.8)
                     brightness(1.1)
-                    hue-rotate(-8deg)
-                    blur(0.8px)
-                    drop-shadow(${intensity}px 0px 0px rgba(255, 0, 255, 0.2))
-                    drop-shadow(-${intensity}px 0px 0px rgba(0, 255, 255, 0.2))
+                    hue-rotate(-10deg)
+                    blur(${blurAmount}px)
+                    drop-shadow(${intensity}px 0px 0px rgba(255, 0, 0, 0.5))
+                    drop-shadow(-${intensity}px 0px 0px rgba(0, 255, 255, 0.5))
+                    drop-shadow(0px ${intensity/2}px 0px rgba(255, 0, 255, 0.4))
                 `;
                 setTimeout(() => {
                     video.style.filter = `
                         sepia(0.3)
-                        saturate(0.7)
-                        contrast(0.9)
-                        brightness(1.1)
+                        saturate(0.65)
+                        contrast(0.85)
+                        brightness(1.05)
                         hue-rotate(-8deg)
-                        blur(0.8px)
-                        drop-shadow(1px 0px 0px rgba(255, 0, 255, 0.15))
-                        drop-shadow(-1px 0px 0px rgba(0, 255, 255, 0.15))
+                        blur(2px)
+                        drop-shadow(2px 0px 0px rgba(255, 0, 0, 0.4))
+                        drop-shadow(-2px 0px 0px rgba(0, 255, 255, 0.4))
+                        drop-shadow(0px 1px 0px rgba(255, 0, 255, 0.3))
                     `;
                 }, Math.random() * 150 + 50);
             }

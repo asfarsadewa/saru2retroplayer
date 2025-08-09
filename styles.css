@@ -68,7 +68,7 @@ body {
         perspective(1000px)
         scaleY(0.98)
         scaleX(0.98);
-    filter: blur(0.2px);
+    filter: blur(0.4px);
 }
 
 .crt-overlay::before {
@@ -127,7 +127,7 @@ body {
         perspective(1000px)
         scaleY(1)
         scaleX(1);
-    filter: contrast(1.05) brightness(0.95);
+    filter: contrast(1.05) brightness(0.95) blur(0.3px);
 }
 
 #videoPlayer {
@@ -141,16 +141,17 @@ body {
     display: none;
     filter: 
         sepia(0.3)
-        saturate(0.7)
-        contrast(0.9)
-        brightness(1.1)
+        saturate(0.65)
+        contrast(0.85)
+        brightness(1.05)
         hue-rotate(-8deg)
-        blur(0.8px)
-        drop-shadow(1px 0px 0px rgba(255, 0, 255, 0.15))
-        drop-shadow(-1px 0px 0px rgba(0, 255, 255, 0.15));
+        blur(2px)
+        drop-shadow(2px 0px 0px rgba(255, 0, 0, 0.4))
+        drop-shadow(-2px 0px 0px rgba(0, 255, 255, 0.4))
+        drop-shadow(0px 1px 0px rgba(255, 0, 255, 0.3));
     transform: scaleX(1.33) scaleY(1.0);
     animation: vhs-distortion 0.2s infinite linear;
-    opacity: 0.92;
+    opacity: 0.88;
 }
 
 /* Hide browser default subtitle rendering */
@@ -866,14 +867,15 @@ body {
         transform: scaleX(1.33) scaleY(1.0) translateX(0px);
         filter: 
             sepia(0.3)
-            saturate(0.7)
-            contrast(0.9)
-            brightness(1.1)
+            saturate(0.65)
+            contrast(0.85)
+            brightness(1.05)
             hue-rotate(-8deg)
-            blur(0.8px)
-            drop-shadow(1px 0px 0px rgba(255, 0, 255, 0.15))
-            drop-shadow(-1px 0px 0px rgba(0, 255, 255, 0.15));
-        opacity: 0.92;
+            blur(2px)
+            drop-shadow(2px 0px 0px rgba(255, 0, 0, 0.4))
+            drop-shadow(-2px 0px 0px rgba(0, 255, 255, 0.4))
+            drop-shadow(0px 1px 0px rgba(255, 0, 255, 0.3));
+        opacity: 0.88;
     }
     25% {
         transform: scaleX(1.33) scaleY(1.0) translateX(1px);
@@ -883,13 +885,14 @@ body {
         filter: 
             sepia(0.35)
             saturate(0.6)
-            contrast(0.85)
-            brightness(1.15)
+            contrast(0.8)
+            brightness(1.1)
             hue-rotate(-10deg)
-            blur(1px)
-            drop-shadow(2px 0px 0px rgba(255, 0, 255, 0.2))
-            drop-shadow(-2px 0px 0px rgba(0, 255, 255, 0.2));
-        opacity: 0.9;
+            blur(2.5px)
+            drop-shadow(3px 0px 0px rgba(255, 0, 0, 0.5))
+            drop-shadow(-3px 0px 0px rgba(0, 255, 255, 0.5))
+            drop-shadow(0px 2px 0px rgba(255, 0, 255, 0.4));
+        opacity: 0.85;
     }
     75% {
         transform: scaleX(1.33) scaleY(1.0) translateX(0px);
@@ -898,14 +901,15 @@ body {
         transform: scaleX(1.33) scaleY(1.0) translateX(0px);
         filter: 
             sepia(0.3)
-            saturate(0.7)
-            contrast(0.9)
-            brightness(1.1)
+            saturate(0.65)
+            contrast(0.85)
+            brightness(1.05)
             hue-rotate(-8deg)
-            blur(0.8px)
-            drop-shadow(1px 0px 0px rgba(255, 0, 255, 0.15))
-            drop-shadow(-1px 0px 0px rgba(0, 255, 255, 0.15));
-        opacity: 0.92;
+            blur(2px)
+            drop-shadow(2px 0px 0px rgba(255, 0, 0, 0.4))
+            drop-shadow(-2px 0px 0px rgba(0, 255, 255, 0.4))
+            drop-shadow(0px 1px 0px rgba(255, 0, 255, 0.3));
+        opacity: 0.88;
     }
 }
 
