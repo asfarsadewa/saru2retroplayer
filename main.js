@@ -4,6 +4,7 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const ffmpegStatic = require('ffmpeg-static');
 const ffprobeStatic = require('ffprobe-static');
+const youtubedl = require('youtube-dl-exec');
 
 let mainWindow;
 
@@ -389,4 +390,110 @@ ipcMain.handle('switch-audio-track', async (event, videoPath, audioTrackIndex) =
     console.error('Error switching audio track:', error);
     return { success: false, error: error.message };
   }
+});
+
+// YouTube URL handler with better error handling
+ipcMain.handle('load-youtube-url', async (event, url) => {
+  return new Promise((resolve) => {
+    console.log('Fetching YouTube video info for:', url);
+    
+    const ytdlpPath = path.join(__dirname, 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp.exe');
+    
+    // Check if yt-dlp.exe exists
+    if (!fs.existsSync(ytdlpPath)) {
+      console.error('yt-dlp.exe not found at:', ytdlpPath);
+      resolve({
+        success: false,
+        error: 'YouTube downloader not found. Please ensure yt-dlp.exe is installed.'
+      });
+      return;
+    }
+    
+    console.log('Using yt-dlp at:', ytdlpPath);
+    
+    // Spawn yt-dlp process directly for better control
+    const ytdlp = spawn(ytdlpPath, [
+      url,
+      '--get-url',
+      '--no-playlist',  // Important: Only get the single video, not the playlist
+      '--format', 'best[height<=720]',  // Simplified format
+      '--no-check-certificates',
+      '--no-warnings',
+      '--quiet',  // Less verbose output
+      '--no-cache-dir'  // Avoid cache issues
+    ]);
+    
+    let output = '';
+    let errorOutput = '';
+    let timedOut = false;
+    
+    // Set a timeout of 30 seconds
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      console.log('yt-dlp process timed out, killing...');
+      ytdlp.kill('SIGTERM');
+    }, 30000);
+    
+    ytdlp.stdout.on('data', (data) => {
+      output += data.toString();
+      console.log('yt-dlp output chunk received:', data.toString().substring(0, 100));
+    });
+    
+    ytdlp.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+      console.log('yt-dlp stderr:', data.toString());
+    });
+    
+    ytdlp.on('error', (error) => {
+      clearTimeout(timeout);
+      console.error('Failed to spawn yt-dlp:', error);
+      resolve({
+        success: false,
+        error: `Failed to start YouTube downloader: ${error.message}`
+      });
+    });
+    
+    ytdlp.on('close', (code) => {
+      clearTimeout(timeout);
+      
+      if (timedOut) {
+        console.error('yt-dlp timed out');
+        resolve({
+          success: false,
+          error: 'Request timed out. The video might be unavailable or restricted.'
+        });
+        return;
+      }
+      
+      if (code !== 0) {
+        console.error(`yt-dlp exited with code ${code}`);
+        console.error('Error output:', errorOutput);
+        resolve({
+          success: false,
+          error: errorOutput || `YouTube downloader failed with code ${code}`
+        });
+        return;
+      }
+      
+      const videoUrl = output.trim();
+      if (!videoUrl) {
+        console.error('No URL extracted from yt-dlp output');
+        resolve({
+          success: false,
+          error: 'Could not extract video URL. The video might be unavailable.'
+        });
+        return;
+      }
+      
+      console.log('YouTube video URL extracted successfully');
+      console.log('URL length:', videoUrl.length);
+      
+      resolve({
+        success: true,
+        url: videoUrl,
+        title: 'YouTube Video',
+        duration: 0
+      });
+    });
+  });
 });
