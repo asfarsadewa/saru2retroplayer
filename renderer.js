@@ -24,6 +24,8 @@ class RetroVideoPlayer {
         this.dropZone = document.getElementById('dropZone');
         this.videoOverlay = document.querySelector('.video-overlay');
         this.subtitleOverlay = document.getElementById('subtitleOverlay');
+        this.urlInput = document.getElementById('urlInput');
+        this.loadUrlBtn = document.getElementById('loadUrlBtn');
         
         // Status indicators
         this.playIndicator = document.querySelector('.play-indicator');
@@ -83,6 +85,14 @@ class RetroVideoPlayer {
         this.confirmAudioBtn.addEventListener('click', () => this.confirmAudioSelection());
         this.cancelAudioBtn.addEventListener('click', () => this.cancelAudioSelection());
         
+        // URL input handling
+        this.loadUrlBtn.addEventListener('click', () => this.loadYouTubeURL());
+        this.urlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.loadYouTubeURL();
+            }
+        });
+        
         this.setupDragAndDrop();
         
         ipcRenderer.on('load-video', (event, filePath) => {
@@ -138,9 +148,18 @@ class RetroVideoPlayer {
         return videoExtensions.includes(extension);
     }
     
-    async loadVideo(filePath, selectedAudioTrack = 0) {
+    async loadVideo(filePath, selectedAudioTrack = 0, isYouTubeURL = false) {
         this.currentVideoPath = filePath;
         this.dropZone.style.display = 'none';
+        
+        // If it's a YouTube URL, we don't need to extract subtitles/audio tracks
+        if (isYouTubeURL) {
+            this.subtitles = [];
+            this.audioTracks = [];
+            this.selectedAudioTrack = 0;
+            this.finalizeVideoLoad(true);
+            return;
+        }
         
         try {
             // Load track information first
@@ -169,10 +188,51 @@ class RetroVideoPlayer {
         }
     }
     
-    finalizeVideoLoad() {
-        // Set video source (for now, just load the original file)
-        // TODO: Implement audio track selection via FFmpeg
-        this.video.src = `file://${this.currentVideoPath}`;
+    async loadYouTubeURL() {
+        const url = this.urlInput.value.trim();
+        if (!url) {
+            alert('Please enter a YouTube URL');
+            return;
+        }
+        
+        // Basic YouTube URL validation
+        if (!url.includes('youtube.com/watch') && !url.includes('youtu.be/')) {
+            alert('Please enter a valid YouTube URL');
+            return;
+        }
+        
+        // Show loading state
+        this.loadUrlBtn.classList.add('loading');
+        this.loadUrlBtn.textContent = 'LOADING...';
+        
+        try {
+            const result = await ipcRenderer.invoke('load-youtube-url', url);
+            
+            if (result.success) {
+                console.log('YouTube video loaded:', result.title);
+                this.loadVideo(result.url, 0, true);
+                this.urlInput.value = ''; // Clear input after successful load
+            } else {
+                alert(`Failed to load video: ${result.error}`);
+            }
+        } catch (error) {
+            console.error('Error loading YouTube URL:', error);
+            alert('Failed to load YouTube video');
+        } finally {
+            // Reset button state
+            this.loadUrlBtn.classList.remove('loading');
+            this.loadUrlBtn.textContent = 'LOAD';
+        }
+    }
+    
+    finalizeVideoLoad(isStreamURL = false) {
+        // Set video source
+        // For YouTube/stream URLs, use directly; for local files, add file:// protocol
+        if (isStreamURL) {
+            this.video.src = this.currentVideoPath;
+        } else {
+            this.video.src = `file://${this.currentVideoPath}`;
+        }
         this.video.style.display = 'block';
         this.addVHSEffect();
         
