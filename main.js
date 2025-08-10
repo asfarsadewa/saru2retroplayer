@@ -6,6 +6,15 @@ const ffmpegStatic = require('ffmpeg-static');
 const ffprobeStatic = require('ffprobe-static');
 const youtubedl = require('youtube-dl-exec');
 
+// Helper function to get executable paths for production
+function getExecutablePath(devPath, exeName) {
+  if (app.isPackaged) {
+    // In production, look for the executable in the resources folder
+    return path.join(process.resourcesPath, 'bin', exeName);
+  }
+  return devPath;
+}
+
 let mainWindow;
 
 function createWindow() {
@@ -147,7 +156,8 @@ function extractSubtitles(videoPath) {
     }
 
     // First, probe for subtitle streams using ffprobe
-    const ffprobe = spawn(ffprobeStatic.path, [
+    const ffprobePath = getExecutablePath(ffprobeStatic.path, 'ffprobe.exe');
+    const ffprobe = spawn(ffprobePath, [
       '-v', 'quiet',
       '-print_format', 'json',
       '-show_streams',
@@ -212,7 +222,8 @@ function extractSubtitleTrack(videoPath, streamIndex, trackIndex, outputDir, vid
       return;
     }
 
-    const ffmpeg = spawn(ffmpegStatic, [
+    const ffmpegPath = getExecutablePath(ffmpegStatic, 'ffmpeg.exe');
+    const ffmpeg = spawn(ffmpegPath, [
       '-i', videoPath,
       '-map', `0:${streamIndex}`,
       '-c:s', 'webvtt',
@@ -302,7 +313,8 @@ function convertSrtToVtt(srtPath) {
 // Audio track detection
 function detectAudioTracks(videoPath) {
   return new Promise((resolve, reject) => {
-    const ffprobe = spawn(ffprobeStatic.path, [
+    const ffprobePath = getExecutablePath(ffprobeStatic.path, 'ffprobe.exe');
+    const ffprobe = spawn(ffprobePath, [
       '-v', 'quiet',
       '-print_format', 'json',
       '-show_streams',
@@ -397,7 +409,10 @@ ipcMain.handle('load-youtube-url', async (event, url) => {
   return new Promise((resolve) => {
     console.log('Fetching YouTube video info for:', url);
     
-    const ytdlpPath = path.join(__dirname, 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp.exe');
+    // Use different path for packaged vs development
+    const ytdlpPath = app.isPackaged 
+      ? path.join(process.resourcesPath, 'bin', 'yt-dlp.exe')
+      : path.join(__dirname, 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp.exe');
     
     // Check if yt-dlp.exe exists
     if (!fs.existsSync(ytdlpPath)) {
