@@ -311,8 +311,16 @@ class RetroVideoPlayer {
     stopVideo() {
         this.video.pause();
         this.video.currentTime = 0;
+        this.video.style.display = 'none';
+        this.video.src = '';
         this.playButton.style.display = 'flex';
         this.videoOverlay.style.opacity = '1';
+        
+        // Show drop zone again for loading new videos
+        this.dropZone.style.display = 'flex';
+        
+        // Clear current video path
+        this.currentVideoPath = null;
         
         // Update button and status indicators
         this.playPauseBtn.querySelector('.btn-icon').innerHTML = '▶';
@@ -323,10 +331,18 @@ class RetroVideoPlayer {
     
     onVideoEnded() {
         this.isPlaying = false;
+        this.video.style.display = 'none';
+        this.video.src = '';
         this.playButton.style.display = 'flex';
         this.videoOverlay.style.opacity = '1';
         this.playPauseBtn.querySelector('.btn-icon').innerHTML = '▶';
         this.playPauseBtn.querySelector('.btn-label').innerHTML = 'PLAY';
+        
+        // Show drop zone again for loading new videos
+        this.dropZone.style.display = 'flex';
+        
+        // Clear current video path
+        this.currentVideoPath = null;
         
         // Update status indicators
         this.playIndicator.classList.remove('active');
