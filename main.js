@@ -156,7 +156,9 @@ function extractSubtitles(videoPath) {
     }
 
     // First, probe for subtitle streams using ffprobe
-    const ffprobePath = getExecutablePath(ffprobeStatic.path, 'ffprobe.exe');
+    const ffprobePath = app.isPackaged 
+      ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'ffprobe-static', 'bin', 'win32', 'x64', 'ffprobe.exe')
+      : ffprobeStatic.path;
     const ffprobe = spawn(ffprobePath, [
       '-v', 'quiet',
       '-print_format', 'json',
@@ -222,7 +224,9 @@ function extractSubtitleTrack(videoPath, streamIndex, trackIndex, outputDir, vid
       return;
     }
 
-    const ffmpegPath = getExecutablePath(ffmpegStatic, 'ffmpeg.exe');
+    const ffmpegPath = app.isPackaged 
+      ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'ffmpeg-static', 'ffmpeg.exe')
+      : ffmpegStatic;
     const ffmpeg = spawn(ffmpegPath, [
       '-i', videoPath,
       '-map', `0:${streamIndex}`,
@@ -313,7 +317,9 @@ function convertSrtToVtt(srtPath) {
 // Audio track detection
 function detectAudioTracks(videoPath) {
   return new Promise((resolve, reject) => {
-    const ffprobePath = getExecutablePath(ffprobeStatic.path, 'ffprobe.exe');
+    const ffprobePath = app.isPackaged 
+      ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'ffprobe-static', 'bin', 'win32', 'x64', 'ffprobe.exe')
+      : ffprobeStatic.path;
     const ffprobe = spawn(ffprobePath, [
       '-v', 'quiet',
       '-print_format', 'json',

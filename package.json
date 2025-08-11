@@ -53,7 +53,8 @@
     ],
     "win": {
       "target": "dir",
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.ico",
+      "sign": false
     },
     "mac": {
       "target": "dmg",

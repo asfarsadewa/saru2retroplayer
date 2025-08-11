@@ -46,6 +46,20 @@ class RetroVideoPlayer {
         this.aspectModes = ['crop', 'stretch', 'fit'];
         this.currentAspectMode = 1; // Default to stretch mode
         
+        // Web Audio API properties
+        this.audioContext = null;
+        this.audioSource = null;
+        this.splitterNode = null;
+        this.mergerNode = null;
+        this.crackleBand = null;
+        this.lowPassFilter = null;
+        this.highPassFilter = null;
+        this.compressor = null;
+        this.reverbNode = null;
+        this.masterGain = null;
+        this.isAudioProcessingEnabled = true;
+        this._lastVolume = 0.5;
+        
         this.initializeEventListeners();
         this.applyRetroEffects();
         this.updateVolumeKnob();
@@ -247,6 +261,9 @@ class RetroVideoPlayer {
         this.loadSubtitleTracks();
         this.setupAudioTrackSwitching();
         
+        // Initialize audio processing
+        this.initializeAudioProcessing();
+        
         console.log(`Video loaded with audio track ${this.selectedAudioTrack}: ${this.audioTracks[this.selectedAudioTrack]?.label || 'Default'}`);
     }
     
@@ -270,6 +287,11 @@ class RetroVideoPlayer {
         this.playPauseBtn.querySelector('.btn-label').innerHTML = 'PAUSE';
         this.videoOverlay.style.opacity = '0';
         
+        // Resume audio context if needed (browser autoplay policy)
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+        }
+        
         // Update status indicators
         this.playIndicator.classList.add('active');
         this.pauseIndicator.classList.remove('active');
@@ -289,8 +311,16 @@ class RetroVideoPlayer {
     stopVideo() {
         this.video.pause();
         this.video.currentTime = 0;
+        this.video.style.display = 'none';
+        this.video.src = '';
         this.playButton.style.display = 'flex';
         this.videoOverlay.style.opacity = '1';
+        
+        // Show drop zone again for loading new videos
+        this.dropZone.style.display = 'flex';
+        
+        // Clear current video path
+        this.currentVideoPath = null;
         
         // Update button and status indicators
         this.playPauseBtn.querySelector('.btn-icon').innerHTML = '▶';
@@ -301,10 +331,18 @@ class RetroVideoPlayer {
     
     onVideoEnded() {
         this.isPlaying = false;
+        this.video.style.display = 'none';
+        this.video.src = '';
         this.playButton.style.display = 'flex';
         this.videoOverlay.style.opacity = '1';
         this.playPauseBtn.querySelector('.btn-icon').innerHTML = '▶';
         this.playPauseBtn.querySelector('.btn-label').innerHTML = 'PLAY';
+        
+        // Show drop zone again for loading new videos
+        this.dropZone.style.display = 'flex';
+        
+        // Clear current video path
+        this.currentVideoPath = null;
         
         // Update status indicators
         this.playIndicator.classList.remove('active');
@@ -327,25 +365,58 @@ class RetroVideoPlayer {
     }
     
     setVolume() {
-        this.video.volume = this.volumeSlider.value / 100;
+        const volume = this.volumeSlider.value / 100;
+        
+        if (this.isAudioProcessingEnabled && this.masterGain) {
+            // Use Web Audio API master gain
+            this.masterGain.gain.value = volume;
+            this.video.volume = 1; // Keep video volume at max, control through Web Audio
+        } else {
+            // Fallback to video element volume
+            this.video.volume = volume;
+        }
+        
         this.updateMuteButton();
     }
     
     toggleMute() {
-        if (this.video.muted) {
-            this.video.muted = false;
-            this.volumeSlider.value = this.video.volume * 100;
+        if (this.isAudioProcessingEnabled && this.masterGain) {
+            // Handle mute through Web Audio API
+            if (this.masterGain.gain.value > 0) {
+                this._lastVolume = this.masterGain.gain.value;
+                this.masterGain.gain.value = 0;
+                this.volumeSlider.value = 0;
+            } else {
+                const restoredVolume = this._lastVolume || 0.5;
+                this.masterGain.gain.value = restoredVolume;
+                this.volumeSlider.value = restoredVolume * 100;
+            }
         } else {
-            this.video.muted = true;
+            // Fallback to video element mute
+            if (this.video.muted) {
+                this.video.muted = false;
+                this.volumeSlider.value = this.video.volume * 100;
+            } else {
+                this.video.muted = true;
+            }
         }
         this.updateMuteButton();
     }
     
     updateMuteButton() {
         const icon = this.muteBtn.querySelector('.btn-icon');
-        if (this.video.muted || this.video.volume === 0) {
+        let volume = this.video.volume;
+        
+        // Use Web Audio volume if processing is enabled
+        if (this.isAudioProcessingEnabled && this.masterGain) {
+            volume = this.masterGain.gain.value;
+        }
+        
+        const isMuted = this.video.muted || volume === 0;
+        
+        if (isMuted) {
             icon.innerHTML = '🔇';
-        } else if (this.video.volume < 0.5) {
+        } else if (volume < 0.5) {
             icon.innerHTML = '🔉';
         } else {
             icon.innerHTML = '🔊';
@@ -874,6 +945,193 @@ class RetroVideoPlayer {
         this.audioSelectionOverlay.style.display = 'none';
         this.isWaitingForAudioSelection = false;
         this.finalizeVideoLoad();
+    }
+    
+    initializeAudioProcessing() {
+        try {
+            // Create or resume audio context
+            if (!this.audioContext) {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            // Resume audio context if it's suspended (required by browser security)
+            if (this.audioContext.state === 'suspended') {
+                this.audioContext.resume();
+            }
+            
+            // Wait for video to have enough data to create media source
+            if (this.video.readyState >= 2) {
+                this.setupAudioNodes();
+            } else {
+                // Wait for video to be ready
+                this.video.addEventListener('loadeddata', () => {
+                    this.setupAudioNodes();
+                }, { once: true });
+            }
+        } catch (error) {
+            console.warn('Web Audio API not supported or failed to initialize:', error);
+            this.isAudioProcessingEnabled = false;
+        }
+    }
+    
+    setupAudioNodes() {
+        try {
+            // Disconnect existing nodes if they exist
+            this.disconnectAudioNodes();
+            
+            // Create media source from video element
+            this.audioSource = this.audioContext.createMediaElementSource(this.video);
+            
+            // Create stereo-to-mono conversion nodes
+            this.splitterNode = this.audioContext.createChannelSplitter(2);
+            this.mergerNode = this.audioContext.createChannelMerger(2);
+            
+            // Create filter nodes for vintage audio characteristics
+            this.lowPassFilter = this.audioContext.createBiquadFilter();
+            this.lowPassFilter.type = 'lowpass';
+            this.lowPassFilter.frequency.value = 8000; // Simulate vintage speakers
+            this.lowPassFilter.Q.value = 0.7;
+            
+            this.highPassFilter = this.audioContext.createBiquadFilter();
+            this.highPassFilter.type = 'highpass';
+            this.highPassFilter.frequency.value = 80; // Remove very low frequencies
+            this.highPassFilter.Q.value = 0.7;
+            
+            // Create compressor for vintage dynamics
+            this.compressor = this.audioContext.createDynamicsCompressor();
+            this.compressor.threshold.value = -20;
+            this.compressor.knee.value = 10;
+            this.compressor.ratio.value = 8;
+            this.compressor.attack.value = 0.01;
+            this.compressor.release.value = 0.25;
+            
+            // Create convolver for vintage reverb
+            this.reverbNode = this.audioContext.createConvolver();
+            this.createVintageImpulseResponse();
+            
+            // Create master gain node
+            this.masterGain = this.audioContext.createGain();
+            this.masterGain.gain.value = 1.0;
+            
+            // Create mono conversion by combining channels
+            const monoGain = this.audioContext.createGain();
+            monoGain.gain.value = 0.5; // Reduce volume when combining channels
+            
+            // Connect audio processing chain
+            // Source -> Splitter -> Mono conversion -> Filters -> Compressor -> Reverb -> Master Gain -> Destination
+            this.audioSource.connect(this.splitterNode);
+            
+            // Mix left and right channels to mono
+            this.splitterNode.connect(monoGain, 0); // Left channel
+            this.splitterNode.connect(monoGain, 1); // Right channel
+            
+            // Connect the mono signal to both output channels
+            monoGain.connect(this.mergerNode, 0, 0); // To left output
+            monoGain.connect(this.mergerNode, 0, 1); // To right output
+            
+            // Apply vintage audio processing (removed reverb for subtlety)
+            this.mergerNode.connect(this.highPassFilter);
+            this.highPassFilter.connect(this.lowPassFilter);
+            this.lowPassFilter.connect(this.compressor);
+            this.compressor.connect(this.masterGain);
+            this.masterGain.connect(this.audioContext.destination);
+            
+            // Start oldies effects
+            this.startCrackleEffect();
+            this.startWowFlutterEffect();
+            
+            console.log('Audio processing chain initialized with mono conversion and vintage effects');
+        } catch (error) {
+            console.warn('Failed to setup audio processing:', error);
+            // Fallback to direct connection
+            if (this.audioSource) {
+                this.audioSource.connect(this.audioContext.destination);
+            }
+        }
+    }
+    
+    disconnectAudioNodes() {
+        if (this.audioSource) {
+            this.audioSource.disconnect();
+        }
+        if (this.splitterNode) this.splitterNode.disconnect();
+        if (this.mergerNode) this.mergerNode.disconnect();
+        if (this.lowPassFilter) this.lowPassFilter.disconnect();
+        if (this.highPassFilter) this.highPassFilter.disconnect();
+        if (this.compressor) this.compressor.disconnect();
+        if (this.reverbNode) this.reverbNode.disconnect();
+        if (this.masterGain) this.masterGain.disconnect();
+    }
+    
+    createVintageImpulseResponse() {
+        // Create a simple vintage reverb impulse response
+        const length = this.audioContext.sampleRate * 0.8; // 0.8 second reverb
+        const impulse = this.audioContext.createBuffer(2, length, this.audioContext.sampleRate);
+        
+        for (let channel = 0; channel < 2; channel++) {
+            const channelData = impulse.getChannelData(channel);
+            for (let i = 0; i < length; i++) {
+                const decay = Math.pow(1 - (i / length), 2); // Exponential decay
+                channelData[i] = (Math.random() * 2 - 1) * decay * 0.1;
+            }
+        }
+        
+        this.reverbNode.buffer = impulse;
+    }
+    
+    startCrackleEffect() {
+        // Add random crackling sounds typical of old records/equipment
+        setInterval(() => {
+            if (this.isAudioProcessingEnabled && this.audioContext && Math.random() < 0.05) {
+                this.addCrackle();
+            }
+        }, 200);
+    }
+    
+    addCrackle() {
+        try {
+            const oscillator = this.audioContext.createOscillator();
+            const gain = this.audioContext.createGain();
+            const filter = this.audioContext.createBiquadFilter();
+            
+            // Create brief noise burst
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.value = Math.random() * 1000 + 500;
+            
+            filter.type = 'highpass';
+            filter.frequency.value = 2000;
+            
+            gain.gain.value = 0;
+            gain.gain.setValueAtTime(0, this.audioContext.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.005, this.audioContext.currentTime + 0.001);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.015);
+            
+            oscillator.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.masterGain || this.audioContext.destination);
+            
+            oscillator.start();
+            oscillator.stop(this.audioContext.currentTime + 0.02);
+        } catch (error) {
+            console.warn('Crackle effect error:', error);
+        }
+    }
+    
+    startWowFlutterEffect() {
+        // Simulate wow and flutter of old tape players
+        if (!this.audioContext || !this.lowPassFilter) return;
+        
+        const modulateFrequency = () => {
+            if (this.isAudioProcessingEnabled && this.lowPassFilter) {
+                // Subtle frequency modulation
+                const flutter = Math.sin(Date.now() * 0.003) * 15; // 3Hz flutter
+                const wow = Math.sin(Date.now() * 0.0007) * 30; // 0.7Hz wow
+                const baseFreq = 8000;
+                this.lowPassFilter.frequency.value = baseFreq + flutter + wow;
+            }
+        };
+        
+        setInterval(modulateFrequency, 50);
     }
 }
 
