@@ -54,7 +54,7 @@
     "win": {
       "target": "dir",
       "icon": "assets/icon.ico",
-      "sign": false
+      "forceCodeSigning": false
     },
     "mac": {
       "target": "dmg",
