@@ -132,6 +132,12 @@ function createWindow() {
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
+  // Clean up temporary files
+  if (fs.existsSync(tempDir)) {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    console.log(`Cleaned up temporary directory: ${tempDir}`);
+  }
+
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -207,6 +213,12 @@ function extractSubtitles(videoPath) {
   });
 }
 
+function getFfmpegPath() {
+  return app.isPackaged
+    ? ffmpegStatic.replace('app.asar', 'app.asar.unpacked')
+    : ffmpegStatic;
+}
+
 function extractSubtitleTrack(videoPath, streamIndex, trackIndex, outputDir, videoName, streamInfo) {
   return new Promise((resolve) => {
     const language = streamInfo.tags?.language || `track${trackIndex}`;
@@ -224,10 +236,7 @@ function extractSubtitleTrack(videoPath, streamIndex, trackIndex, outputDir, vid
       return;
     }
 
-    const ffmpegPath = app.isPackaged 
-      ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'ffmpeg-static', 'ffmpeg.exe')
-      : ffmpegStatic;
-    const ffmpeg = spawn(ffmpegPath, [
+    const ffmpeg = spawn(getFfmpegPath(), [
       '-i', videoPath,
       '-map', `0:${streamIndex}`,
       '-c:s', 'webvtt',
@@ -398,16 +407,63 @@ ipcMain.handle('get-audio-tracks', async (event, videoPath) => {
   }
 });
 
-ipcMain.handle('switch-audio-track', async (event, videoPath, audioTrackIndex) => {
-  try {
-    // For now, just log the track switch
-    // Full implementation would require generating temporary video with selected audio
-    console.log(`Audio track switch requested: track ${audioTrackIndex} for ${videoPath}`);
-    return { success: true, message: `Switched to audio track ${audioTrackIndex}` };
-  } catch (error) {
-    console.error('Error switching audio track:', error);
-    return { success: false, error: error.message };
-  }
+// Ensure temp directory for audio muxing exists
+const tempDir = path.join(app.getPath('temp'), 'saru2-retro-player');
+if (!fs.existsSync(tempDir)) {
+  fs.mkdirSync(tempDir, { recursive: true });
+}
+
+ipcMain.handle('switch-audio-track', async (event, videoPath, audioTrack) => {
+  return new Promise((resolve) => {
+    const videoName = path.basename(videoPath, path.extname(videoPath));
+    const outputFileName = `${videoName}_audio_${audioTrack.index}.mkv`;
+    const outputPath = path.join(tempDir, outputFileName);
+
+    // If the remuxed file already exists, just return its path
+    if (fs.existsSync(outputPath)) {
+      console.log(`Remuxed file already exists: ${outputPath}`);
+      resolve({ success: true, filePath: outputPath });
+      return;
+    }
+
+    const ffmpegPath = getFfmpegPath();
+
+    // Command to copy all video, subtitle, and the selected audio stream
+    const args = [
+      '-i', videoPath,
+      '-map', '0:v',      // Map all video streams
+      '-map', `0:${audioTrack.index}`, // Map the selected audio stream
+      '-map', '0:s?',     // Map all subtitle streams (optional)
+      '-c', 'copy',       // Copy codecs without re-encoding
+      '-y',               // Overwrite output file if it exists
+      outputPath
+    ];
+
+    console.log(`Spawning FFmpeg with args: ${args.join(' ')}`);
+
+    const ffmpeg = spawn(ffmpegPath, args);
+
+    let ffmpegError = '';
+    ffmpeg.stderr.on('data', (data) => {
+      ffmpegError += data.toString();
+      console.log(`FFmpeg stderr: ${data}`);
+    });
+
+    ffmpeg.on('close', (code) => {
+      if (code === 0) {
+        console.log(`Successfully remuxed video to: ${outputPath}`);
+        resolve({ success: true, filePath: outputPath });
+      } else {
+        console.error(`FFmpeg exited with code ${code}:`, ffmpegError);
+        resolve({ success: false, error: `FFmpeg failed with code ${code}: ${ffmpegError}` });
+      }
+    });
+
+    ffmpeg.on('error', (error) => {
+      console.error('Failed to spawn FFmpeg:', error);
+      resolve({ success: false, error: `Failed to start FFmpeg: ${error.message}` });
+    });
+  });
 });
 
 // YouTube URL handler with better error handling
