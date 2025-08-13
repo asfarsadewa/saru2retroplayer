@@ -26,6 +26,7 @@ class RetroVideoPlayer {
         this.subtitleOverlay = document.getElementById('subtitleOverlay');
         this.urlInput = document.getElementById('urlInput');
         this.loadUrlBtn = document.getElementById('loadUrlBtn');
+        this.loadingOverlay = document.getElementById('loadingOverlay');
         
         // Status indicators
         this.playIndicator = document.querySelector('.play-indicator');
@@ -41,6 +42,7 @@ class RetroVideoPlayer {
         this.audioTracks = [];
         this.currentAudioTrack = 0;
         this.currentVideoPath = null;
+        this.originalVideoPath = null;
         this.selectedAudioTrack = 0;
         this.isWaitingForAudioSelection = false;
         this.aspectModes = ['crop', 'stretch', 'fit'];
@@ -164,9 +166,9 @@ class RetroVideoPlayer {
     
     async loadVideo(filePath, selectedAudioTrack = 0, isYouTubeURL = false) {
         this.currentVideoPath = filePath;
+        this.originalVideoPath = isYouTubeURL ? null : filePath;
         this.dropZone.style.display = 'none';
-        
-        // If it's a YouTube URL, we don't need to extract subtitles/audio tracks
+
         if (isYouTubeURL) {
             this.subtitles = [];
             this.audioTracks = [];
@@ -176,21 +178,14 @@ class RetroVideoPlayer {
         }
         
         try {
-            // Load track information first
             this.subtitles = await ipcRenderer.invoke('get-subtitles', filePath);
             this.audioTracks = await ipcRenderer.invoke('get-audio-tracks', filePath);
             
-            // If multiple audio tracks exist, show selection dialog
-            // TODO: Implement audio track switching with FFmpeg (see GitHub issue)
-            // For now, always use the default (first) audio track
-            /*
-            if (this.audioTracks.length > 1 && selectedAudioTrack === 0) {
+            if (this.audioTracks.length > 1 && !this.isWaitingForAudioSelection) {
                 this.showAudioSelectionDialog();
-                return; // Wait for user selection
+                return;
             }
-            */
             
-            // Load video with selected audio track
             this.selectedAudioTrack = selectedAudioTrack;
             this.finalizeVideoLoad();
             
@@ -198,7 +193,7 @@ class RetroVideoPlayer {
             console.error('Error loading video:', error);
             this.subtitles = [];
             this.audioTracks = [];
-            this.finalizeVideoLoad(); // Load anyway with defaults
+            this.finalizeVideoLoad();
         }
     }
     
@@ -869,36 +864,7 @@ class RetroVideoPlayer {
     
     async switchAudioTrack() {
         if (this.audioTracks.length <= 1) return;
-        
-        this.currentAudioTrack = (this.currentAudioTrack + 1) % this.audioTracks.length;
-        const currentTrack = this.audioTracks[this.currentAudioTrack];
-        
-        // Store current playback state
-        const currentTime = this.video.currentTime;
-        const wasPlaying = !this.video.paused;
-        
-        console.log(`Switching to audio track: ${currentTrack.label}`);
-        
-        // Update button appearance to show switching state
-        this.audioBtn.classList.add('active');
-        this.audioBtn.querySelector('.btn-icon').style.color = '#ffff88';
-        
-        try {
-            // Request audio track switch from main process
-            await ipcRenderer.invoke('switch-audio-track', this.currentVideoPath, this.currentAudioTrack);
-            
-            // For now, just show feedback - proper implementation would require
-            // temporary file generation with selected audio stream
-            console.log(`Audio track switched to: ${currentTrack.label}`);
-            
-        } catch (error) {
-            console.error('Error switching audio track:', error);
-        }
-        
-        setTimeout(() => {
-            this.audioBtn.classList.remove('active');
-            this.audioBtn.querySelector('.btn-icon').style.color = '#ddd';
-        }, 1000);
+        this.showAudioSelectionDialog();
     }
     
     showAudioSelectionDialog() {
@@ -934,17 +900,63 @@ class RetroVideoPlayer {
         this.audioSelectionOverlay.style.display = 'flex';
     }
     
-    confirmAudioSelection() {
+    async confirmAudioSelection() {
         this.audioSelectionOverlay.style.display = 'none';
         this.isWaitingForAudioSelection = false;
-        this.finalizeVideoLoad();
+
+        const selectedTrack = this.audioTracks[this.selectedAudioTrack];
+        if (!selectedTrack) {
+            this.finalizeVideoLoad();
+            return;
+        }
+
+        // If the selected track is already the current one, do nothing
+        if (this.currentAudioTrack === this.selectedAudioTrack && this.currentVideoPath === this.originalVideoPath) {
+            this.finalizeVideoLoad();
+            return;
+        }
+
+        const currentTime = this.video.currentTime;
+        const wasPlaying = !this.video.paused;
+
+        this.loadingOverlay.style.display = 'flex';
+
+        try {
+            console.log(`Requesting switch to audio track: ${selectedTrack.label}`);
+            const result = await ipcRenderer.invoke('switch-audio-track', this.originalVideoPath, selectedTrack);
+
+            if (result.success) {
+                this.currentVideoPath = result.filePath;
+                this.currentAudioTrack = this.selectedAudioTrack;
+                this.finalizeVideoLoad(false); // It's a local file path, not a stream URL
+
+                this.video.addEventListener('loadedmetadata', () => {
+                    this.video.currentTime = currentTime;
+                    if (wasPlaying) {
+                        this.video.play();
+                    }
+                }, { once: true });
+
+            } else {
+                alert(`Failed to switch audio track: ${result.error}`);
+                this.finalizeVideoLoad(); // Reload original video
+            }
+        } catch (error) {
+            console.error('Error switching audio track:', error);
+            alert('An error occurred while switching the audio track.');
+            this.finalizeVideoLoad();
+        } finally {
+            this.loadingOverlay.style.display = 'none';
+        }
     }
-    
+
     cancelAudioSelection() {
-        this.selectedAudioTrack = 0; // Use default (first track)
         this.audioSelectionOverlay.style.display = 'none';
         this.isWaitingForAudioSelection = false;
-        this.finalizeVideoLoad();
+        // If it's the first time loading, finalize with the default track
+        if (!this.video.src) {
+            this.finalizeVideoLoad();
+        }
     }
     
     initializeAudioProcessing() {
